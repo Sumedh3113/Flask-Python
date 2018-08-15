@@ -1,6 +1,14 @@
-from flask import Flask,render_template,url_for,flash, redirect
+import os
+# os module to save the file with same extension as uploaded 
+import secrets
+# to generate new name every time you upload the file
+
+from PIL import Image
+# for resizing the image
+
+from flask import Flask,render_template,url_for,flash, redirect,request
 from flask_blog import app,db,bcrypt
-from flask_blog.forms import RegistrationForm, LoginForm
+from flask_blog.forms import RegistrationForm, LoginForm, UpdateAccountForm
 
 from flask_blog.models import User,Post
 from flask_login import login_user, current_user, logout_user, login_required
@@ -79,8 +87,10 @@ def login():
         user = User.query.filter_by(email=form.email.data).first()
         if user and bcrypt.check_password_hash(user.password, form.password.data):
             login_user(user, remember=form.remember.data)
-            #next_page = request.args.get('next')
-            return redirect(url_for('home'))
+            next_page = request.args.get('next')
+            # if we try to access account page without logging in then we will redirected to login page 
+            #but after we login we will be redirected to about page directly instead of home page
+            return  redirect(next_page) if next_page else redirect(url_for('home'))
         else:
             flash('Login Unsuccessful. Please check email and password', 'danger')
     return render_template('login.html', title='Login', form=form)
@@ -92,9 +102,52 @@ def logout():
     logout_user()
     return redirect(url_for('home'))
 
-@app.route("/account")
+
+def save_picture(form_picture):
+    random_hex = secrets.token_hex(8)
+    # the function .splittext()  will give file_name and extention
+    # since we  dont need file name we use _ , f-ext 
+    _, f_ext = os.path.splitext(form_picture.filename)
+    picture_fn = random_hex + f_ext
+    picture_path = os.path.join(app.root_path, 'static/profile_pics', picture_fn)
+    # here we are saving the uploaded picture at above path but before 
+    #form_picture.save(picture_path)
+   
+    
+    output_size = (125, 125)
+    i = Image.open(form_picture)
+    i.thumbnail(output_size)
+    # i is new form_picture
+    i.save(picture_path)
+    
+     
+    # returning picture file name so that user can use it outside this function
+    return picture_fn
+
+@app.route("/account",methods=['GET', 'POST'])
 @login_required
 ## page will not be accessed it logged out
 def account():
-    return render_template('account.html', title='Account')
-
+    form = UpdateAccountForm()
+    if form.validate_on_submit():
+        if form.picture.data:
+            # saving the picture from form field
+            picture_file = save_picture(form.picture.data)
+            # passing image to current user ()image file is a attribute below
+            current_user.image_file = picture_file
+        # Committing new changes 
+        current_user.username = form.username.data
+        current_user.email = form.email.data
+        db.session.commit()
+        flash('Your account has been updated!', 'success')
+        # here after making changes we are redirecting the page to get an updated response from server
+        # i.e we are sending GET request to the server if we reload it using render_temp we will send POST req 
+        # which is not good
+        return redirect(url_for('account'))
+    elif request.method == 'GET':
+        #retrieving new changes
+        form.username.data = current_user.username
+        form.email.data = current_user.email
+    image_file = url_for('static', filename='profile_pics/' + current_user.image_file)
+    return render_template('account.html', title='Account',
+                           image_file=image_file, form=form)
