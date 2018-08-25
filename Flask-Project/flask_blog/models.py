@@ -1,7 +1,10 @@
+from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
+
 from datetime import datetime
-from flask_blog import db, login_manager
+from flask_blog import db, login_manager,app
 from flask_login import UserMixin
 # For active , anonymous and other users
+
 
 
 @login_manager.user_loader
@@ -19,6 +22,25 @@ class User(db.Model, UserMixin):
     # backref is used to get the user who created the post
     #lazy attribute is used to get all the posts created by a user
     # here we are referencing the Post class that's why we have Posts
+
+    def get_reset_token(self, expires_sec=1800):
+        # its 1800 sec i.e 30 min
+        s = Serializer(app.config['SECRET_KEY'], expires_sec)
+        return s.dumps({'user_id': self.id}).decode('utf-8')
+
+    # we are not using self keyword so we define staticmethod keyword 
+    # to tell python do not expect self as argument we are only going to
+    # use token
+    
+    @staticmethod
+    def verify_reset_token(token):
+        s = Serializer(app.config['SECRET_KEY'])
+        try:
+            user_id = s.loads(token)['user_id']
+        except:
+            return None
+        return User.query.get(user_id)
+
 
     def __repr__(self):
         return f"User('{self.username}', '{self.email}', '{self.image_file}')"
