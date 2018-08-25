@@ -1,16 +1,36 @@
 {% extends "layout.html" %}
 {% block content %}
-	{% for post in postss %}
+	{% for post in postss.items %}
+	<!--as out postss variable is now paginated we have to use the extention .items -->
 	<article class="media content-section">
+		<!-- to display user image with his post here author is a back reference which give access to cuurent_usr in routes file post function -->
+		<img class="rounded-circle article-img" src="{{ url_for('static', filename='profile_pics/' + post.author.image_file)}}">
 	    <div class="media-body">
 	    	<div class="article-metadata">
-	    	  <a class="mr-2" href="#">{{ post.author }}</a>
-	    	  <small class="text-muted">{{ post.date }}</small>
+	    	  <a class="mr-2" href="{{ url_for('user_posts', username=post.author.username) }}">{{ post.author.username }}</a>
+	    	  <!--post.auther will print complete post object -->
+	    	  <small class="text-muted">{{ post.date_posted.strftime('%Y-%m-%d') }}</small>
+	    	  <!--To just print date and time we use post.date and above code is used for only date  -->
 	    	</div>
-	    	<h2><a class="article-title" href="#">{{ post.title }}</a></h2>
+	    	<h2><a class="article-title" href="{{url_for('post', post_id = post.id)}}">{{ post.title }}</a></h2>
 	    	<p class="article-content">{{ post.content }}</p>
 	  </div>
 	</article>
 	{% endfor %}
+
+	<!--code for adding links at the bottom for pages left_current =1 means 1 link at the left of selected page left_edge=1 means only 1 page link is shown which is at the left edge-->
+
+	 {% for page_num in postss.iter_pages(left_edge=1, right_edge=1, left_current=1, right_current=2) %}
+      {% if page_num %}
+        {% if postss.page == page_num %}
+          <a class="btn btn-info mb-4" href="{{ url_for('home', page=page_num) }}">{{ page_num }}</a>
+        {% else %}
+          <a class="btn btn-outline-info mb-4" href="{{ url_for('home', page=page_num) }}">{{ page_num }}</a>
+        {% endif %}
+      {% else %}
+        ...
+      {% endif %}
+    {% endfor %}
+
 {% endblock content %}
 <!--content is optional here while ending -->
